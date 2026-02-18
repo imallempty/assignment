@@ -1,4 +1,3 @@
-// frontend/src/App.js
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
@@ -11,91 +10,120 @@ function App() {
   const [timeRange, setTimeRange] = useState(5);
   const wsRef = useRef(null);
 
-  // WebSocket 연결 및 시간 범위 전송
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/ws');
-    wsRef.current = ws;
-    
-    ws.onopen = () => {
-      console.log('WebSocket Connected');
-      // 연결 즉시 시간 범위 전송
-      ws.send(JSON.stringify({ timeRange: timeRange }));
+    let ws;
+    let reconnectTimer;
+
+    const connect = () => {
+      ws = new WebSocket('ws://localhost:8000/ws');
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ timeRange }));
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        setStats(prev => {
+          // 값이 같으면 업데이트 안 함
+          if (
+            prev.total === data.total &&
+            prev.overall_avg_speed === data.overall_avg_speed &&
+            JSON.stringify(prev.type_stats) === JSON.stringify(data.type_stats)
+          ) {
+            return prev;
+          }
+          return data;
+        });
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket Error:', error);
+      };
+
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connect, 3000);
+      };
     };
-    
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setStats(data);
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      ws?.close();
     };
-    
-    ws.onerror = (error) => {
-      console.error('WebSocket Error:', error);
-    };
-    
-    ws.onclose = () => {
-      console.log('WebSocket Disconnected');
-    };
-    
-    return () => ws.close();
   }, []);
 
-  // 시간 범위 변경 시 WebSocket으로 전송
   useEffect(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ timeRange: timeRange }));
-      console.log(`Sent timeRange: ${timeRange} minutes`);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ timeRange }));
     }
   }, [timeRange]);
 
-  return (
-    <div className="App">
-      <header className="dashboard-header">
-        <h1>실시간 교통 모니터링 대시보드</h1>
-      </header>
+  const TYPE_COLORS = {
+    Pedestrian: '#4ade80',
+    Bike: '#60a5fa',
+    Vehicle: '#f97316',
+    LargeVehicle: '#a78bfa',
+  };
 
-      {/* 시간 범위 선택 */}
-      <div className="time-selector">
-        <label>시간 범위: </label>
-        <select 
-          value={timeRange} 
+  const isEmpty = stats.total === 0;
+
+  return (
+    <div className="app">
+      <header className="header">
+        <h1>교통 모니터링 대시보드</h1>
+        <select
+          className="select"
+          value={timeRange}
           onChange={(e) => setTimeRange(Number(e.target.value))}
         >
           <option value={5}>최근 5분</option>
           <option value={30}>최근 30분</option>
         </select>
-      </div>
+      </header>
 
-      {/* KPI 카드 */}
-      <div className="kpi-container">
-        <div className="kpi-card">
-          <h3>총 감지 수</h3>
-          <p className="kpi-value">{stats.total}</p>
-        </div>
-
-        <div className="kpi-card">
-          <h3>평균 속도</h3>
-          <p className="kpi-value">{stats.overall_avg_speed.toFixed(2)} m/s</p>
-        </div>
-      </div>
-
-      {/* 타입별 감지 수 */}
-      <div className="type-stats">
-        <h2>타입별 감지 현황</h2>
-        {stats.type_stats.length === 0 ? (
-          <p className="no-data">데이터 없음</p>
-        ) : (
-          <div className="type-list">
-            {stats.type_stats.map((type, index) => (
-              <div key={index} className="type-item">
-                <span className="type-name">{type.type}</span>
-                <span className="type-count">{type.count}개</span>
-                <span className="type-speed">{type.avg_speed.toFixed(2)} m/s</span>
-              </div>
-            ))}
+      <main className="main">
+        <div className="kpi-grid">
+          <div className="kpi-card">
+            <span className="kpi-label">총 감지 수</span>
+            {isEmpty
+              ? <span className="empty">데이터 없음</span>
+              : <span className="kpi-num">{stats.total.toLocaleString()}</span>
+            }
           </div>
-        )}
-      </div>
+          <div className="kpi-card">
+            <span className="kpi-label">평균 속도</span>
+            {isEmpty
+              ? <span className="empty">데이터 없음</span>
+              : <span className="kpi-num">{stats.overall_avg_speed.toFixed(1)}<small> m/s</small></span>
+            }
+          </div>
+        </div>
+
+        <section className="section">
+          <h2 className="section-title">타입별 현황</h2>
+          {isEmpty ? (
+            <div className="empty-box">데이터 없음</div>
+          ) : (
+            <div className="type-grid">
+              {stats.type_stats.map((item) => (
+                <div className="type-card" key={item.type}>
+                  <div
+                    className="type-dot"
+                    style={{ background: TYPE_COLORS[item.type] ?? '#94a3b8' }}
+                  />
+                  <span className="type-name">{item.type}</span>
+                  <span className="type-count">{item.count}개</span>
+                  <span className="type-speed">{item.avg_speed.toFixed(1)} m/s</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
     </div>
   );
-}
+} 
 
 export default App;

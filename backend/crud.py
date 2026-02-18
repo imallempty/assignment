@@ -1,7 +1,12 @@
 from sqlalchemy.orm import Session
 import models, schemas
-from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def create_event(db: Session, event_data: schemas.IngestEvent):
@@ -10,7 +15,7 @@ def create_event(db: Session, event_data: schemas.IngestEvent):
         zone=event_data.zone
     )
     db.add(db_event)
-    db.flush() 
+    db.flush()
     
     for obj in event_data.objects:
         db_obj = models.Object(
@@ -29,8 +34,10 @@ def create_event(db: Session, event_data: schemas.IngestEvent):
 
 
 def get_stats(db: Session, from_time: datetime, to_time: datetime, zone: str = None):
+    from_time = _ensure_utc(from_time)
+    to_time = _ensure_utc(to_time)
+
     query = db.query(models.Object).join(models.Event)
-    
     query = query.filter(models.Event.timestamp >= from_time)
     query = query.filter(models.Event.timestamp <= to_time)
     
@@ -47,7 +54,6 @@ def get_stats(db: Session, from_time: datetime, to_time: datetime, zone: str = N
         }
     
     total_objects = len(all_objects)
-    
     overall_avg_speed = sum(obj.speed_ms for obj in all_objects) / total_objects
     
     type_dict = {}
