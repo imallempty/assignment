@@ -2,9 +2,9 @@
 ### Docker Compose로 전체 실행
 docker-compose up --build
 
-# 접속
-# - Backend API: http://localhost:8000/docs
-# - Frontend Dashboard: http://localhost:3000
+### 접속
+- Backend API: http://localhost:8000/docs
+- Frontend Dashboard: http://localhost:3000
 
 ## API 사용 예시
 
@@ -74,7 +74,8 @@ ws.onmessage = (event) => {
 ```
 
 ## 간단 아키텍처 설명
-![alt text](image.png)
+![제목을 입력해주세요](https://github.com/user-attachments/assets/ad53109a-fb26-4d23-8c74-039f32edcb5b)
+
 
 **데이터 흐름:**
 1. POST /ingest → Event + Objects DB 저장
